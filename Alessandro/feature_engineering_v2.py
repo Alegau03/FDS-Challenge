@@ -1,8 +1,8 @@
 """
 Feature engineering 
 
-Obiettivo pratico (in parole semplici): trasformare ogni battaglia JSON in una riga di
-tabella con tante colonne (feature) utili ai modelli. Le feature includono:
+Trasforma ogni battaglia JSON in una riga di tabella con tante colonne (feature) utili ai modelli. 
+Le feature includono:
 - informazioni statiche sui team (medie/max delle statistiche base, diversità/entropia tipi, indici offense/defense/speed);
 - informazioni dinamiche dai primi `max_turns` turni (default 30) con finestre [1–10], [11–20], [21–30],
   rate per turno, mosse prioritarie, switch (anche forzati), KO, boost, danni (anche EMA), status inflitti e loro persistenza;
@@ -69,9 +69,7 @@ def type_multiplier(attacking_types, defending_types):
 
 def get_static_features(team_details, prefix):
     """Estrae feature statiche dal team.
-
-    Spiegato semplice: guardiamo chi c'è nel team (anche solo il lead se siamo in test) e
-    calcoliamo medie, massimi e dispersioni delle statistiche base, quanta varietà di tipi c'è,
+    Calcola medie, massimi e dispersioni delle statistiche base, quanta varietà di tipi c'è,
     e tre indici intuitivi:
     - offense = base_atk + base_spa (quanto possiamo fare male)
     - defense = base_hp + base_def + base_spd (quanto reggiamo)
