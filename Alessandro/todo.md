@@ -1,4 +1,5 @@
 # Todo
+- z-normalizzation delle stats
 
 - Togliere il max dalle statistiche statiche
 
