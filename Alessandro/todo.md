@@ -1,5 +1,7 @@
 # Todo
 
+- z-normalizzation delle stats
+
 - Togliere il max dalle statistiche statiche
 
 - Nelle finestre temporali % hp rimasti invece che danno inflitto
