@@ -5,7 +5,7 @@ Le feature si dividono in tre blocchi: statiche, dinamiche, e derivate/differenz
 ### Statiche (team-level)
 
 - Aggregati sulle statistiche base del team (per p1 e p2):
-  - Medie, deviazioni standard e massimi per: base_hp, base_atk, base_def, base_spa, base_spd, base_spe.
+  - Medie, deviazioni standard e massimi per: base_hp, base_atk, base_def, base_spa, base_spd, base_spe - prova da togliere il max
   - Numero di tipi unici nel team (escludendo "notype").
   - Indici compositi:
     - Offense index: base_atk + base_spa (per Pokémon), poi media/std/max sul team.
@@ -18,14 +18,14 @@ Le feature si dividono in tre blocchi: statiche, dinamiche, e derivate/differenz
 
 - Finestre temporali: 1–10 (w1), 11–20 (w2), 21–30 (w3).
 - Metriche per giocatore (p1 e p2), totali e per-finestra:
-  - damage_dealt (danno inflitto; da delta `hp_pct` dell’avversario nel tempo).
+  - damage_dealt (danno inflitto; da delta `hp_pct` dell’avversario nel tempo) - prova a mettere % vita invece che dannp
   - fainted_pokemon (KO inflitti; dal raggiungimento di `hp_pct == 0`).
   - switches; forced_switches (euristico su danni subiti elevati nel turno precedente).
   - boosts totali e boost per singola stat: atk/def/spa/spd/spe (somma dei boost positivi).
   - status_inflicted (onset di status) e status_turns_inflicted (turni in cui l’avversario è sotto status).
   - priority_moves (mosse con priorità > 0).
-  - lead_changes (cambi di leadership via danno cumulativo inflitto).
-  - time_to_first_ko_inflicted (indice temporale del primo KO inflitto o -1 se assente).
+  - lead_changes (cambi di leadership via danno cumulativo inflitto) - forse da togliere
+  - time_to_first_ko_inflicted (indice temporale del primo KO inflitto o -1 se assente) - da togliere
 - EMA del danno (ema_damage_dealt) con alpha=0.3 per catturare il momentum recente.
 - Rate per turno: varianti normalizzate per numero di turni effettivi.
 
