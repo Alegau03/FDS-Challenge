@@ -26,7 +26,7 @@ Le feature si dividono in tre blocchi: statiche, dinamiche, e derivate/differenz
   - priority_moves (mosse con priorità > 0).
   - lead_changes (cambi di leadership via danno cumulativo inflitto) - forse da togliere
   - time_to_first_ko_inflicted (indice temporale del primo KO inflitto o -1 se assente) - da togliere
-- EMA del danno (ema_damage_dealt) con alpha=0.3 per catturare il momentum recente.
+- EMA del danno (ema_damage_dealt) con alpha=0.3 serve per catturare il momentum recente media esponenziale dei valori di danno per turno che dà più peso ai turni recenti e meno ai turni lontani nel tempo. È utile per rappresentare la “momentum” offensiva e la recency
 - Rate per turno: varianti normalizzate per numero di turni effettivi.
 
 ### Type-chart advantage
