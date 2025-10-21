@@ -1,0 +1,4 @@
+.venv
+dataset/*
+Lorenzinco/__pycache__
+Lorenzinco/artifacts/*
