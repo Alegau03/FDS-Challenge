@@ -16,12 +16,12 @@ THRESHOLD_PATH = 'models/best_threshold.json'
 N_SPLITS = 5  # Numero di fold per la Cross-Validation
 RANDOM_STATE = 42 # Seed per la riproducibilità
 MAX_TURNS = 30  # Usa solo i primi 30 turni del battle_log
-N_REPEATS = 2  # V6.1: Aumentato a 2 per maggiore robustezza (10 fold totali)
-SEED_BAGGING = 3  # V6.1: Aumentato a 3 per stabilità predizioni (era 1)
+N_REPEATS = 1  # Numero di ripetizioni della K-Fold (Repeated StratifiedKFold)
+SEED_BAGGING = 1  # Numero di semi diversi per model bagging per ogni fold
 
 # --- Modelli ed Ensembling ---
-# Scegli quali modelli allenare e usare in ensemble
-MODEL_TYPES = ['lgbm', 'cat']  # V6.2: Rimosso xgb (contribuisce solo 12%, rallenta training)
+
+MODEL_TYPES = ['lgbm', 'cat', 'xgb']  
 # Pesi dell'ensemble (si normalizzano in predict/train)
 ENSEMBLE_WEIGHTS = {
 	'lgbm': 1.0,
