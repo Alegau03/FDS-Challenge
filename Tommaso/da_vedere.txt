@@ -1,0 +1,30 @@
+### COSE DA VEDERE
+
+- swap features per data augmantation ha senso? le battaglie pokemon sono simmetriche ma non nel nostro dataset. Le info del p1 e del p2 sono leggermente diverse
+
+### MODIFICHE FATTE
+
+1. Rimozione delle Feature di Interazione Manuali
+Ho disabilitato la creazione delle feature di interazione (quelle create dalla funzione add_interaction_features).
+
+Perché: I modelli che stai usando (LightGBM e CatBoost) sono GBDT (Gradient Boosted Decision Trees) e sono già estremamente efficaci nel trovare da soli le interazioni complesse tra le variabili. Fornirgliele manualmente a volte può solo aggiungere rumore.
+
+Come: Non ho cancellato la funzione, ho solo commentato la riga che la chiamava alla fine di create_feature_df().
+
+2. Semplificazione del "Vantaggio di Tipo"
+Ho eliminato la logica di combinazione manuale (il mix 70%/30%) per il vantaggio di tipo.
+
+Perché: Invece di decidere noi un peso fisso (70% vs. 30%), è meglio passare entrambe le feature al modello separatamente:
+
+p1_type_advantage_vs_p2_seen_alive (vantaggio certo vs. visti)
+
+p1_expected_type_advantage_unseen_p2 (vantaggio atteso vs. non visti)
+
+Vantaggio: In questo modo, lasciamo che sia il modello stesso a decidere il peso e l'importanza di ciascuna feature, che è quasi sempre una scelta migliore.
+
+3. Aggiunta dell'Analisi di Ridondanza
+Ho aggiunto la nuova funzione analyze_feature_redundancy(df).
+
+Perché: Avevamo il sospetto che molte feature di "danno" (diff_damage_dealt, diff_ema_damage_dealt, diff_phys_damage, ecc.) fossero troppo simili tra loro (altamente correlate).
+
+Come: Questa funzione stampa la matrice di correlazione per quelle feature specifiche. Come abbiamo visto dai tuoi log, ci ha permesso di invalidare quell'ipotesi (le correlazioni erano basse) e confermare che le feature sono tutte utili.
