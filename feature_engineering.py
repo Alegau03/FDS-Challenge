@@ -264,8 +264,8 @@ def get_static_features(team_details, prefix):
 
 def get_dynamic_features(battle_log, max_turns=30, p1_team_total_hp=0, p2_team_total_hp=0, 
                         p1_team_details=None, p2_team_details=None):
-    """Estrae feature dinamiche per entrambi i giocatori basandosi sul battle log.
-    """
+    #Estrae feature dinamiche per entrambi i giocatori basandosi sul battle log.
+
     # Inizializza le feature base
     base_metrics = ['damage_dealt', 'fainted_pokemon', 'switches', 'status_inflicted']  # V6: rimossi boosts, priority_moves
 
@@ -286,7 +286,7 @@ def get_dynamic_features(battle_log, max_turns=30, p1_team_total_hp=0, p2_team_t
 
 
     def _init_move_rich(d):
-        """Aggiunge al dict d i campi per feature mosse avanzate."""
+        # Aggiunge al dict d i campi per feature mosse avanzate.
         # conteggi generali mosse
         d['moves_used'] = 0
         d['damaging_moves_used'] = 0
@@ -386,9 +386,6 @@ def get_dynamic_features(battle_log, max_turns=30, p1_team_total_hp=0, p2_team_t
     p2_hp_series = []
 
     def _calc_team_hp_metrics(pokemon_hp_dict, team_total_base_hp):
-        """
-        HP concentration RIMOSSA (ridondante, corr=-0.701 con avg_hp_per_alive).
-        """
         if not pokemon_hp_dict or team_total_base_hp == 0:
             return {
                 'team_hp_remaining_pct': 0.0,
@@ -422,9 +419,6 @@ def get_dynamic_features(battle_log, max_turns=30, p1_team_total_hp=0, p2_team_t
         p2_state = turn.get('p2_pokemon_state', {}) or {}
         p1_move = turn.get('p1_move_details', {}) or {}
         p2_move = turn.get('p2_move_details', {}) or {}
-
-        # Condizioni di campo (se strutturate nel turno)
-        field = turn.get('field', {}) or {}
             
         if p1_state and p2_state:
             p1_pkmn_name = p1_state.get('name')
@@ -574,7 +568,6 @@ def get_dynamic_features(battle_log, max_turns=30, p1_team_total_hp=0, p2_team_t
                     feat_dict['spec_damage'] += od
                     spa = _get_num(atk_state.get('base_spa'), 0.0)
                     spd = max(1.0, _get_num(def_state.get('base_spd'), 1.0))
-                # Aggregate features (super_effective_hits, immune_hits, etc.) già catturano pattern
                 # STAB aggregati
                 if is_stab:
                     feat_dict['stab_moves_count'] += 1
@@ -872,100 +865,100 @@ def add_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
     
-    # 1) Danno × Velocità: chi fa più danno E è più veloce ha vantaggio
+    # Danno × Velocità: chi fa più danno E è più veloce ha vantaggio
     if 'diff_damage_dealt' in df.columns and 'diff_lead_base_spe' in df.columns:
         df['interact_damage_x_speed'] = df['diff_damage_dealt'] * df['diff_lead_base_spe']
     
-    # 2) Bilancio team × Vantaggio tipi: team offensivo con vantaggio tipi è letale
+    # Bilancio team × Vantaggio tipi: team offensivo con vantaggio tipi è letale
     if 'p1_team_offense_defense_ratio' in df.columns and 'diff_type_off_mult' in df.columns:
         df['interact_p1_ratio_x_type'] = df['p1_team_offense_defense_ratio'] * df['diff_type_off_mult']
     if 'p2_team_offense_defense_ratio' in df.columns and 'diff_type_off_mult' in df.columns:
         df['interact_p2_ratio_x_type'] = df['p2_team_offense_defense_ratio'] * (-df['diff_type_off_mult'])
 
-    # 4) KO × Danno: pressure offensiva totale
+    # KO × Danno: pressure offensiva totale
     if 'diff_fainted_pokemon' in df.columns and 'diff_damage_dealt' in df.columns:
         df['interact_ko_x_damage'] = df['diff_fainted_pokemon'] * df['diff_damage_dealt']
 
-    # 6) Status × Danno: status debuffano quindi amplificano il danno
+    # Status × Danno: status debuffano quindi amplificano il danno
     if 'diff_status_inflicted' in df.columns and 'diff_damage_dealt' in df.columns:
         df['interact_status_x_damage'] = df['diff_status_inflicted'] * df['diff_damage_dealt']
     
-    # 7) Offense index × Type advantage
+    # Offense index × Type advantage
     if 'diff_team_mean_offense' in df.columns and 'diff_type_off_mult' in df.columns:
         df['interact_offense_x_type'] = df['diff_team_mean_offense'] * df['diff_type_off_mult']
     
-    # 8) Speed × Outspeed probability: velocità assoluta vs relativa
+    # Speed × Outspeed probability: velocità assoluta vs relativa
     if 'diff_lead_base_spe' in df.columns and 'diff_outspeed_prob' in df.columns:
         df['interact_speed_x_outspeed'] = df['diff_lead_base_spe'] * df['diff_outspeed_prob']
     
-    # 9) Rapporto offense/defense e danno per turno (w1)
+    # Rapporto offense/defense e danno per turno (w1)
     if 'p1_team_offense_defense_ratio' in df.columns and 'p1_damage_dealt_w1_rate' in df.columns:
         df['interact_p1_ratio_x_dmg_rate_w1'] = df['p1_team_offense_defense_ratio'] * df['p1_damage_dealt_w1_rate']
     if 'p2_team_offense_defense_ratio' in df.columns and 'p2_damage_dealt_w1_rate' in df.columns:
         df['interact_p2_ratio_x_dmg_rate_w1'] = df['p2_team_offense_defense_ratio'] * df['p2_damage_dealt_w1_rate']
     
-    # 1. HP × Accuracy: Capacità offensiva totale
+    # HP × Accuracy: Capacità offensiva totale
     if 'p1_team_mean_base_hp' in df.columns and 'p1_avg_accuracy_used' in df.columns:
         df['v7_hp_x_accuracy'] = df['p1_team_mean_base_hp'] * df['p1_avg_accuracy_used']
     
-    # 2. Damage primo turno × Fainted: Early game pressure
+    # Damage primo turno × Fainted: Early game pressure
     if 'p1_damage_dealt_w1' in df.columns and 'p1_fainted_pokemon' in df.columns:
         df['v7_damage_w1_x_fainted'] = df['p1_damage_dealt_w1'] * df['p1_fainted_pokemon']
     
-    # 3. Status × HP%: Effectiveness of status strategy
+    # Status × HP%: Effectiveness of status strategy
     if 'p1_status_inflicted' in df.columns and 'p1_avg_hp_pct_end' in df.columns:
         df['v7_status_x_hp'] = df['p1_status_inflicted'] * df['p1_avg_hp_pct_end']
     
-    # 4. Switch × Damage advantage: Tactical switching effectiveness
+    # Switch × Damage advantage: Tactical switching effectiveness
     if 'p1_switches' in df.columns and 'diff_damage_dealt' in df.columns:
         df['v7_switch_x_dmg_adv'] = df['p1_switches'] * df['diff_damage_dealt']
     
-    # 5. Type advantage × HP: Strategic type matchup
+    # Type advantage × HP: Strategic type matchup
     if 'p1_super_effective_hits' in df.columns and 'p1_avg_hp_pct_end' in df.columns:
         df['v7_type_adv_x_hp'] = df['p1_super_effective_hits'] * df['p1_avg_hp_pct_end']
     
-    # 6. Fainted per turn: Eliminations efficiency
+    # Fainted per turn: Eliminations efficiency
     if 'p1_fainted_pokemon_per_turn' in df.columns:
         df['v7_fainted_efficiency'] = df['p1_fainted_pokemon_per_turn']
     
-    # 7. Damage advantage × Accuracy: Offensive consistency
+    # Damage advantage × Accuracy: Offensive consistency
     if 'diff_damage_dealt' in df.columns and 'p1_avg_accuracy_used' in df.columns:
         df['v7_dmg_adv_x_acc'] = df['diff_damage_dealt'] * df['p1_avg_accuracy_used']
     
-    # 8. HP lost × Damage: Trading efficiency
+    # HP lost × Damage: Trading efficiency
     if 'p1_avg_hp_pct_start' in df.columns and 'p1_avg_hp_pct_end' in df.columns and 'p1_damage_dealt' in df.columns:
         hp_lost_pct = (df['p1_avg_hp_pct_start'] - df['p1_avg_hp_pct_end']) / 100
         df['v7_hp_lost_x_dmg'] = hp_lost_pct * df['p1_damage_dealt']
     
-    # 9. Super effective × HP (diff): Type advantage utilization
+    # Super effective × HP (diff): Type advantage utilization
     if 'diff_super_effective_hits' in df.columns and 'diff_avg_hp_pct_end' in df.columns:
         df['v7_diff_se_x_hp'] = df['diff_super_effective_hits'] * df['diff_avg_hp_pct_end']
     
-    # 10. Switch × HP advantage: Tactical positioning
+    # Switch × HP advantage: Tactical positioning
     if 'p1_switches' in df.columns and 'p1_avg_hp_pct_end' in df.columns and 'p2_avg_hp_pct_end' in df.columns:
         hp_adv = df['p1_avg_hp_pct_end'] - df['p2_avg_hp_pct_end']
         df['v7_switch_x_hp_adv'] = df['p1_switches'] * hp_adv
     
-    # 11. Momentum score: Overall offensive momentum
+    # Momentum score: Overall offensive momentum
     if all(col in df.columns for col in ['diff_damage_dealt', 'p1_avg_accuracy_used', 'p1_avg_hp_pct_end']):
         df['v7_momentum'] = df['diff_damage_dealt'] * df['p1_avg_accuracy_used'] * (df['p1_avg_hp_pct_end'] / 100)
     
-    # 12. Offensive pressure: Sustained threat
+    # Offensive pressure: Sustained threat
     if all(col in df.columns for col in ['p1_damage_dealt', 'p1_super_effective_hits', 'p1_fainted_pokemon']):
         fainted_ratio = df['p1_fainted_pokemon'] / 6.0
         df['v7_offensive_pressure'] = df['p1_damage_dealt'] * df['p1_super_effective_hits'] * (1 + fainted_ratio)
     
-    # 13. Defensive stability: Maintain position
+    # Defensive stability: Maintain position
     if all(col in df.columns for col in ['p1_avg_hp_pct_start', 'p1_avg_hp_pct_end', 'diff_damage_dealt', 'p1_switches']):
         hp_lost_pct = (df['p1_avg_hp_pct_start'] - df['p1_avg_hp_pct_end']) / 100
         # Usa diff_damage_dealt come proxy per danno netto
         df['v7_defensive_stability'] = (1 - hp_lost_pct) * (1 + df['diff_damage_dealt'] / 100) * (1 + df['p1_switches'] / 10)
     
-    # 14. Tempo control: Early dominance
+    # Tempo control: Early dominance
     if all(col in df.columns for col in ['p1_damage_dealt_w1', 'p1_damage_dealt_w2', 'p1_fainted_pokemon']):
         df['v7_tempo_control'] = (df['p1_damage_dealt_w1'] + df['p1_damage_dealt_w2']) * (df['p1_fainted_pokemon'] + 1) / 10
     
-    # 15. Endgame advantage: Close out ability
+    # Endgame advantage: Close out ability
     if all(col in df.columns for col in ['p1_avg_hp_pct_end', 'p1_fainted_pokemon', 'diff_damage_dealt']):
         pokemon_alive = 6 - df['p1_fainted_pokemon']
         df['v7_endgame_advantage'] = df['p1_avg_hp_pct_end'] * pokemon_alive * (1 + df['diff_damage_dealt'] / 100)

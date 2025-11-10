@@ -183,98 +183,60 @@ def train_ensemble():
 
     X = df.drop(columns=['battle_id', 'player_won']).astype(np.float32)
     # Repeated Stratified K-Fold
-
     if config.N_REPEATS > 1:
-
         splitter = RepeatedStratifiedKFold(n_splits=config.N_SPLITS, n_repeats=config.N_REPEATS, random_state=config.RANDOM_STATE)
-
     else:
-
         splitter = StratifiedKFold(n_splits=config.N_SPLITS, shuffle=True, random_state=config.RANDOM_STATE)
-
     # Probs OOF per ogni modello (solo su dataset originale)
-
     oof = {m: np.zeros(len(y)) for m in config.MODEL_TYPES}
 
     # Per stacking/meta-learner e pesi
-
     fold_indices = []
-
     # Carica best params LGBM se esistono
-
     lgb_params = None
-
     if os.path.exists(config.BEST_PARAMS_PATH):
-
         with open(config.BEST_PARAMS_PATH, 'r', encoding='utf-8') as f:
-
             lgb_params = json.load(f)
 
-
-
     # Default params o best salvati
-
     cat_params = None
-
     if os.path.exists(config.BEST_PARAMS_CAT_PATH):
-
         with open(config.BEST_PARAMS_CAT_PATH, 'r', encoding='utf-8') as f:
-
             cat_params = json.load(f)
 
     else:
-
         cat_params = dict(loss_function='Logloss', eval_metric='Logloss', random_seed=config.RANDOM_STATE,
-
                           depth=8, learning_rate=0.03, iterations=3000, verbose=False)
 
 
     xgb_params = None
-
     if os.path.exists(config.BEST_PARAMS_XGB_PATH):
-
         with open(config.BEST_PARAMS_XGB_PATH, 'r', encoding='utf-8') as f:
-
             xgb_params = json.load(f)
 
     else:
-
         xgb_params = dict(objective='binary:logistic', eval_metric='logloss',
 
                           eta=0.03, max_depth=8, subsample=0.8, colsample_bytree=0.8, reg_alpha=1e-6, reg_lambda=0.4,
 
                           tree_method='hist', verbosity=0, n_jobs=-1)
 
-
-
     fold_no = 0
 
     for tr_idx, va_idx in splitter.split(X, y.values):
-
         fold_no += 1
-
         print(f"Fold {fold_no}")
-
         X_tr_base, y_tr_base = X.iloc[tr_idx], y.iloc[tr_idx]
-
         X_va, y_va = X.iloc[va_idx], y.iloc[va_idx]
-
         fold_indices.append((tr_idx, va_idx))
 
-
-
         # Seed bagging: media predictions di più semi
-
         seeds = [config.RANDOM_STATE + s for s in range(max(1, config.SEED_BAGGING))]
-
-
-
+        
         # Imbalance handling
-
         spw = _compute_scale_pos_weight(y_tr_base)
 
         # LIGHTGBM
-
         if 'lgbm' in config.MODEL_TYPES:
 
             params_base = lgb_params or {
@@ -284,47 +246,31 @@ def train_ensemble():
                 'n_estimators': 2000, 'learning_rate': 0.02, 'num_leaves': 128,
 
                 'feature_fraction': 0.8, 'bagging_fraction': 0.8, 'bagging_freq': 3,
-
             }
 
             # add class_weight balanced if not present
-
             if 'class_weight' not in params_base:
-
                 params_base['class_weight'] = 'balanced'
-
+                
             # Augment SOLO training fold con side-swap
-
             X_tr_sw = swap_features_df(X_tr_base)
-
             y_tr_sw = 1 - y_tr_base
-
             X_tr = pd.concat([X_tr_base, X_tr_sw], axis=0).reset_index(drop=True)
-
             y_tr = pd.concat([y_tr_base, y_tr_sw], axis=0).reset_index(drop=True).astype(int)
 
 
 
             preds_bag = np.zeros(len(X_va))
-
             for sd in seeds:
-
                 params = {**params_base, 'random_state': sd}
-
                 m = lgb.LGBMClassifier(**params)
-
                 m.fit(X_tr, y_tr, eval_set=[(X_va, y_va)], eval_metric='logloss',
-
                       callbacks=[lgb.early_stopping(200, verbose=False)])
-
                 preds_bag += m.predict_proba(X_va)[:, 1]
 
             preds_bag /= max(1, len(seeds))
-
             cal = IsotonicRegression(out_of_bounds='clip').fit(preds_bag, y_va)
-
             p_cal = cal.predict(preds_bag)
-
             oof['lgbm'][va_idx] = p_cal
 
             # Per-fold metrics (calibrated)
@@ -456,7 +402,6 @@ def train_ensemble():
     meta_best_thr = 0.5
     meta_best_acc = 0.0
 
-
     if use_stacking:
         X_stack = np.column_stack(oof_stack)  # Shape: (n_samples, n_models)
 
@@ -468,8 +413,6 @@ def train_ensemble():
             max_iter=1000,
             solver='lbfgs'
         )
-
-        
 
         # Train su OOF predictions
         meta_learner.fit(X_stack, y)
