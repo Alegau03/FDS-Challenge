@@ -1,0 +1,26 @@
+# --- Librerie Essenziali per la Baseline e Manipolazione Dati ---
+# Pandas per la gestione dei DataFrame
+pandas
+# NumPy per operazioni numeriche e algebriche
+numpy
+# Scikit-learn per i modelli base, le metriche e la validazione
+scikit-learn
+# TQDM per le barre di progresso, molto utile per monitorare i tempi
+tqdm
+
+# --- Librerie per i Modelli Avanzati (Gradient Boosting) ---
+# LightGBM: veloce, efficiente e ottimo punto di partenza per il boosting
+lightgbm
+# XGBoost: un altro modello potentissimo per dati tabellari
+xgboost
+# CatBoost: eccellente nel gestire variabili categoriche
+catboost
+
+# --- Librerie per l'Ottimizzazione degli Iperparametri ---
+# Optuna: framework moderno e potente per l'hyperparameter tuning
+optuna
+
+# --- Librerie per l'Ambiente Notebook (Opzionali ma consigliate) ---
+# Se vorrai sperimentare in un ambiente simile a Jupyter
+jupyter
+ipython

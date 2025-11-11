@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score, log_loss
 import config as config
 import json
 import os
-from feature_engineering_finale import create_feature_df
+from feature_engineering import create_feature_df
 
 # Carichiamo i dati una sola volta per efficienza
 print("Caricamento dati v3 per l'ottimizzazione LightGBM...")
@@ -17,10 +17,13 @@ y = train_df['player_won'].astype(int)
 X = train_df.drop(columns=['battle_id', 'player_won']).astype('float32')
 
 def objective(trial):
-    """Funzione obiettivo per Optuna: minimizziamo la LogLoss media in CV.
-    Allineata al training v3 (stratified k-fold, early stopping sul fold).
-    """
-    # Definiamo lo spazio di ricerca degli iperparametri
+    #Funzione obiettivo per Optuna: minimizziamo la LogLoss media in CV.
+    #Allineata al training v3 (stratified k-fold, early stopping sul fold). 
+    # Con più samples per feature, possiamo:
+    # - Learning rate più alto (convergenza più veloce)
+    # - Più profondità (max_depth maggiore)
+    # - Meno regolarizzazione (minor rischio overfitting)
+    # - Più num_leaves (modelli più complessi)
     params = {
         'objective': 'binary',
         'metric': 'binary_logloss',
@@ -28,21 +31,21 @@ def objective(trial):
         'boosting_type': 'gbdt',
         'random_state': config.RANDOM_STATE,
         'n_jobs': -1,
-        'n_estimators': trial.suggest_int('n_estimators', 500, 5000),
-        'learning_rate': trial.suggest_float('learning_rate', 0.005, 0.05, log=True),
-        'num_leaves': trial.suggest_int('num_leaves', 31, 256),
-        'max_depth': trial.suggest_int('max_depth', -1, 12),
-        'min_child_samples': trial.suggest_int('min_child_samples', 10, 200),
-        'min_child_weight': trial.suggest_float('min_child_weight', 1e-3, 10.0, log=True),
-        'lambda_l1': trial.suggest_float('lambda_l1', 1e-8, 10.0, log=True),
-        'lambda_l2': trial.suggest_float('lambda_l2', 1e-8, 10.0, log=True),
-        'feature_fraction': trial.suggest_float('feature_fraction', 0.6, 1.0),
-        'bagging_fraction': trial.suggest_float('bagging_fraction', 0.6, 1.0),
+        'n_estimators': trial.suggest_int('n_estimators', 1000, 6000),  # Aumentato: più iterazioni
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.08, log=True),  # Range più alto
+        'num_leaves': trial.suggest_int('num_leaves', 63, 255),  # Aumentato min: modelli più complessi
+        'max_depth': trial.suggest_int('max_depth', 8, 15),  # Più profondo (no -1, troppo rischioso)
+        'min_child_samples': trial.suggest_int('min_child_samples', 10, 100),  # Ridotto max: meno conservativo
+        'min_child_weight': trial.suggest_float('min_child_weight', 1e-3, 5.0, log=True),  # Ridotto max
+        'lambda_l1': trial.suggest_float('lambda_l1', 1e-8, 5.0, log=True),  # Meno regolarizzazione L1
+        'lambda_l2': trial.suggest_float('lambda_l2', 1e-8, 5.0, log=True),  # Meno regolarizzazione L2
+        'feature_fraction': trial.suggest_float('feature_fraction', 0.7, 1.0),  # Aumentato min: più features
+        'bagging_fraction': trial.suggest_float('bagging_fraction', 0.7, 1.0),  # Aumentato min
         'bagging_freq': trial.suggest_int('bagging_freq', 1, 7),
-        'max_bin': trial.suggest_int('max_bin', 63, 511),
+        'max_bin': trial.suggest_int('max_bin', 127, 511),  # Aumentato min: più precisione
         'extra_trees': trial.suggest_categorical('extra_trees', [True, False]),
         'class_weight': trial.suggest_categorical('class_weight', [None, 'balanced']),
-        'min_split_gain': trial.suggest_float('min_split_gain', 0.0, 1.0),
+        'min_split_gain': trial.suggest_float('min_split_gain', 0.0, 0.5),  # Ridotto max: meno conservativo
     }
 
     skf = StratifiedKFold(n_splits=config.N_SPLITS, shuffle=True, random_state=config.RANDOM_STATE)
@@ -67,14 +70,15 @@ def objective(trial):
     return sum(fold_loglosses) / len(fold_loglosses)
 
 if __name__ == "__main__":
-    print("Inizio ottimizzazione LightGBM v3 con Optuna (metrica: LogLoss - minimize)...")
+
+    print("\nInizio ottimizzazione con Optuna\n")
+    
     # Creiamo uno studio, specificando che vogliamo minimizzare la LogLoss
     study = optuna.create_study(direction='minimize')
 
     # Avviamo l'ottimizzazione per 50 tentativi
-    study.optimize(objective, n_trials=20)
+    study.optimize(objective, n_trials=50)
 
-    print("\n------------------ OTTIMIZZAZIONE COMPLETATA ------------------")
     print(f"Miglior LogLoss CV: {study.best_value:.5f}")
     print("Migliori iperparametri trovati:")
     for key, value in study.best_params.items():
@@ -93,5 +97,4 @@ if __name__ == "__main__":
     with open(config.BEST_PARAMS_PATH, 'w') as f:
         json.dump(best_params_payload, f, indent=2)
     print(f"\nParametri migliori salvati in: {config.BEST_PARAMS_PATH}")
-    print("Ora puoi lanciare il training v3 (ensemble) senza modifiche manuali.")
     print("---------------------------------------------------------------")

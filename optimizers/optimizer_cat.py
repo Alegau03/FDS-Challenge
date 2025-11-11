@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 import config as config
-from feature_engineering_finale import create_feature_df
+from feature_engineering import create_feature_df
 
 try:
     from catboost import CatBoostClassifier
@@ -33,15 +33,19 @@ def objective(trial: optuna.Trial):
     skf = StratifiedKFold(n_splits=config.N_SPLITS, shuffle=True, random_state=config.RANDOM_STATE)
 
     params = {
-        'depth': trial.suggest_int('depth', 4, 10),
-        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
-        'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1e-6, 10.0, log=True),
+        'depth': trial.suggest_int('depth', 6, 12),  # Più profondo (era 4-10)
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.15, log=True),  # Range più alto
+        'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1e-6, 5.0, log=True),  # Meno regolarizzazione
         'bagging_temperature': trial.suggest_float('bagging_temperature', 0.0, 5.0),
-        'iterations': trial.suggest_int('iterations', 1500, 6000),
+        'iterations': trial.suggest_int('iterations', 2000, 7000),  # Più iterazioni
+        'min_data_in_leaf': trial.suggest_int('min_data_in_leaf', 1, 20),  # Nuovo: controllo foglie
+        'random_strength': trial.suggest_float('random_strength', 0.5, 2.0),  # Nuovo: randomizzazione
+        'border_count': trial.suggest_int('border_count', 128, 255),  # Nuovo: precisione split
         'random_seed': config.RANDOM_STATE,
         'loss_function': 'Logloss',
         'eval_metric': 'Logloss',
         'verbose': False,
+        'task_type': 'CPU',  # Usa GPU per accelerare training
     }
 
     oof = np.zeros(len(y))
@@ -64,12 +68,21 @@ def main():
         print("CatBoost non disponibile")
         return
 
-    study = optuna.create_study(direction='minimize')
-    study.optimize(objective, n_trials=getattr(config, 'OPTUNA_TRIALS', 20))
+    print("\nInizio ottimizzazione CatBoost con Optuna.\n")
 
+    study = optuna.create_study(direction='minimize')
+    study.optimize(objective, n_trials=getattr(config, 'OPTUNA_TRIALS', 50))
+
+    print("\n" + "=" * 80)
+    print("Best LogLoss:", study.best_value)
+    print("Best params:", study.best_params)
+    print("=" * 80)
+
+    import os
+    os.makedirs(config.MODEL_OUTPUT_DIR, exist_ok=True)
     with open(config.BEST_PARAMS_CAT_PATH, 'w', encoding='utf-8') as f:
         json.dump(study.best_params, f, indent=2)
-    print("Migliori parametri CatBoost salvati.")
+    print("\nMigliori parametri CatBoost salvati in:", config.BEST_PARAMS_CAT_PATH)
 
 
 if __name__ == '__main__':
