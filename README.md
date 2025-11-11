@@ -1,85 +1,163 @@
-    # Pokemon Battle Predictor - Report Tecnico
+# Pokemon Battle Predictor — README
 
-    **Autore:** Alessandro Gautieri  
-    **Data:** Novembre 2025
+Brief professional overview and usage instructions for the repository.
 
-    ## Abstract
+## Overview
 
-    Sistema di predizione per battaglie Pokemon competitive basato su ensemble di gradient boosting models (LightGBM, CatBoost, XGBoost). L'architettura combina feature engineering avanzata (339 features multi-scala temporali, predizione tipi non visti, interaction features) con strategie di training robuste (10-fold CV, side-swap augmentation, isotonic calibration). L'ottimizzazione Bayesiana parallela degli iperparametri e il weighted averaging ensemble garantiscono generalizzazione ottimale. Performance finale: **84.71% accuracy**, **92.14% AUC**, **0.355 LogLoss**.
+This repository contains a production-ready pipeline to predict the winner of competitive Pokemon battles using an ensemble of gradient-boosting models (LightGBM, CatBoost, XGBoost). The pipeline includes:
 
-    ---
+- Feature engineering that produces 339 features (team static features, dynamic battle-log features and interaction features).
+- Per-model hyperparameter optimization via Optuna (separate optimizer scripts for LightGBM, CatBoost and XGBoost).
+- A robust training pipeline with stratified K-fold CV, side-swap augmentation, seed bagging and isotonic calibration.
+- An ensemble stage supporting weighted-average and stacking, plus automated selection between them.
+- Prediction utilities to generate a final submission CSV.
 
-    ## 1. Feature Engineering (339 features)
+This README explains how to run each step and where to find key outputs.
 
-    ### **Finestre Temporali Multi-Scala**
-    Il battle log viene segmentato in 3 finestre (w1: turni 1-10, w2: 11-20, w3: 21-30) per catturare dinamiche early/mid/late game. Per ogni finestra tracciamo:
-    - **Damage dealt/taken**: pressione offensiva per fase
-    - **KO ed switches**: momentum e controllo del match
-    - **Status afflictions**: debuff strategici
-    - **Super-effective hits**: sfruttamento matchup tipo
+## Requirements
 
-    Questo approccio permette al modello di distinguere strategie aggressive early-game da comebacks nel late-game.
+- Python 3.11+ (the project was developed with Python 3.13 in a venv). 
+- Install project dependencies from `requirements.txt`:
 
-    ### **Predizione Tipi Non Visti dell'Avversario**
-    Innovazione chiave: prediciamo i tipi dei Pokemon non ancora rivelati usando la distribuzione globale dei tipi (da `predict.csv`). Calcoliamo il **vantaggio di tipo atteso** moltiplicando probabilità dei tipi non visti per i moltiplicatori offensivi del nostro team. Feature `p1_expected_type_advantage_unseen_p2` cattura il potenziale strategico contro Pokemon nascosti.
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-    ### **Feature Chiave Aggiuntive**
-    - **Type Coverage Metrics**: super-effective/immune/resist counts per team, identificano punti deboli strutturali
-    - **Offensive/Defensive Ratio**: `(Atk+SpA) / (HP+Def+SpD)` misura bilanciamento team
-    - **HP Trajectory**: `avg_hp_pct_start`, `avg_hp_pct_end`, `delta` quantificano trade efficiency
-    - **Interaction Features V7** (15): prodotti non-lineari tra feature correlate (es. `damage × speed`, `status × HP_advantage`) che i GBDT non scoprono facilmente da soli
+Notes:
+- CatBoost can run on CPU or GPU. GPU requires a CUDA-capable device and the GPU-enabled CatBoost build. The `optimizer_cat.py` is configured to use `task_type='GPU'` if CatBoost is installed with GPU support; otherwise it will fail and you should switch it to CPU or install GPU drivers/CatBoost GPU build.
+- If you don't have a GPU, set `task_type: 'CPU'` in `optimizer_cat.py` (or install CatBoost CPU-only package).
 
-    ---
+## File structure (high-level)
 
-    ## 2. Training Strategy
+- `feature_engineering.py` — generates the DataFrame used by training/prediction (includes `create_feature_df`).
+- `optimizer_lightbgm.py` — LightGBM Optuna optimizer (writes `models/best_params.json`).
+- `optimizer_cat.py` — CatBoost Optuna optimizer (writes `models/best_params_cat.json`).
+- `optimizer_xgb.py` — XGBoost Optuna optimizer (writes `models/best_params_xgb.json`).
+- `train_ensemble.py` — main training pipeline that trains models per-fold, performs calibration, and creates the ensemble.
+- `predict_ensemble.py` — loads trained models and produces `submission/ensamble_submission.csv`.
+- `config.py` — central configuration: paths, CV settings and model selection.
+- `models/` — output folder for saved models, calibrators and best params JSON files.
+- `submission/` — output folder for final submission CSV.
 
-    ### **Ensemble Architecture**
-    Tre gradient boosting models complementari:
-    - **LightGBM** (peso 0.431): veloce, ottimo su feature numeriche, gestisce class imbalance con `class_weight='balanced'`
-    - **CatBoost** (peso 0.284): robusto su feature categoriche, riduce overfitting
-    - **XGBoost** (peso 0.284): regolarizzazione L1/L2 forte, stabilità predittiva
+## Quickstart: Optimizers (find best params)
 
-    ### **Cross-Validation & Augmentation**
-    - **10-fold Stratified CV**: preserva distribuzione classi (50/50)
-    - **Side-Swap Augmentation**: raddoppia training set invertendo prospettiva P1↔P2 (genera matchup speculare con label invertito)
-    - **Seed Bagging** (3 seeds): media predizioni con seed diversi per ridurre varianza
-    - **Isotonic Calibration**: per-fold + finale, migliora probabilità calibrate
+Purpose: the optimizer scripts search hyperparameter spaces (via Optuna) and save the best parameters as JSON. Each optimizer implements a CV-based objective (LogLoss) and returns the best configuration for the corresponding model.
 
-    ### **Ensemble Method: Weighted Average**
-    Grid search su OOF predictions identifica pesi ottimali (0.431, 0.284, 0.284). Superiore a stacking perché più robusto e generalizza meglio su test set (0.84710 vs 0.84480).
+Run optimizers (recommended: first ensure `config.py` points to the correct `TRAIN_FILE_PATH` and `MODEL_OUTPUT_DIR`):
 
-    ---
+```bash
+# LightGBM (CPU)
+python optimizer_lightbgm.py
 
-    ## 3. Hyperparameter Optimization
+# XGBoost (CPU)
+python optimizer_xgb.py
 
-    ### **Optimizer Paralleli**
-    Tre script Optuna indipendenti (`optimizer_lightgbm.py`, `optimizer_cat.py`, `optimizer_xgb.py`) eseguiti in parallelo per 200+ trials ciascuno. Search space ottimizzato:
-    - **LightGBM**: `num_leaves` (64-256), `learning_rate` (0.01-0.05), `feature_fraction` (0.6-1.0)
-    - **CatBoost**: `depth` (6-10), `l2_leaf_reg` (1-10), `learning_rate` (0.01-0.05)
-    - **XGBoost**: `max_depth` (6-10), `eta` (0.01-0.05), `reg_lambda` (0.1-1.0)
+# CatBoost (GPU recommended if available)
+python optimizer_cat.py
+```
 
-    **Metric ottimizzata:** LogLoss (direttamente correlata a probabilità calibrate).
+Recommended defaults:
+- `OPTUNA_TRIALS` in `config.py` (or environment) controls the number of trials. Typical values: 50–200.
+- Outputs saved under `models/`:
+  - `best_params.json` (LightGBM)
+  - `best_params_cat.json` (CatBoost)
+  - `best_params_xgb.json` (XGBoost)
 
-    ### **Threshold Optimization**
-    Grid search fine-grained (0.2-0.8, step 0.01) su OOF predictions per massimizzare accuracy. Threshold ottimale: **0.510** (slightly biased verso classe 1 per dataset balanced).
+What each optimizer does (short):
+- `optimizer_lightbgm.py`: loads features once (for efficiency), runs stratified K-fold trials and minimizes CV LogLoss.
+- `optimizer_cat.py`: runs CatBoost CV trials (now configured to use GPU if available), minimizing CV LogLoss.
+- `optimizer_xgb.py`: runs XGBoost CV trials and minimizes CV LogLoss.
 
-    ---
+After completion, the best params files will be used automatically by `train_ensemble.py` if present.
 
-    ## 4. Pipeline End-to-End
+## Feature engineering (how it works)
 
-    ```
-    train.jsonl → Feature Engineering (339) → 10-Fold CV → 
-    → LGBM+Cat+XGB (seed bagging) → Isotonic Calibration → 
-    → Weighted Average (grid search) → Threshold Optimization → 
-    → Ensemble Calibrator → submission.csv
-    ```
+`feature_engineering.py` exposes `create_feature_df(file_path, max_turns=30)` that:
 
-    **Punti di forza:**
-    1. **Robustezza**: side-swap + CV averaging elimina overfitting
-    2. **Scalabilità**: finestre temporali + interaction features catturano pattern complessi
-    3. **Generalizzazione**: weighted average supera stacking, ensemble calibration finale
-    4. **Riproducibilità**: `RANDOM_STATE=42`, configurazione centralizzata in `config.py`
+- Parses each battle JSONL entry and extracts static team features (base stats, type coverage, predicted unseen types using `predictor.py`) and dynamic battle-log features.
+- Generates temporal-windowed statistics (e.g. damage/HP/KO counts across early/mid/late windows), switch and status tracking, momentum indicators, and 15 V7 interaction features.
+- Returns a pandas DataFrame with `battle_id`, (optionally) `player_won` and 339 model-ready features.
 
-    ---
+Notes & tips:
+- Feature generation runs reasonably fast; tests showed ~1295 battles/sec in the dev environment for the V7 pipeline. 
+- `predictor.py` is used to load a global type distribution (`predict.csv`) to estimate unseen types; ensure `predict.csv` is present if using unseen-type features.
 
-    **Risultato Finale:** Accuracy **84.71%** @ threshold 0.510 | AUC **92.14%** | LogLoss **0.355**
+## Training (train_ensemble.py) — what it does
+
+`train_ensemble.py` orchestrates the entire training pipeline:
+
+1. Loads feature DataFrame from `feature_engineering.create_feature_df`.
+2. Applies stratified K-fold CV (controlled by `config.N_SPLITS`) — default 10 folds.
+3. Optionally applies side-swap augmentation to double the training set by swapping player perspectives (controlled in code).
+4. Trains base models per-fold (LightGBM, CatBoost, XGBoost) using `BEST_PARAMS` if found in `models/`.
+   - Each model uses seed bagging, early stopping and per-fold isotonic calibration.
+   - Scale-pos-weight is computed to help with class imbalance.
+5. Aggregates out-of-fold (OOF) probabilities from base models and evaluates metrics (Accuracy, AUC, LogLoss).
+6. Tunes ensemble weights via a small grid search and optionally trains a stacking meta-learner (LogisticRegression) on OOF predictions.
+7. Chooses final ensemble method (weighted-average or stacking) based on OOF performance, saves best threshold and ensemble configuration.
+
+Outputs saved into `models/` (per fold): trained model files, calibrators, `ensemble_weights.json`, `best_threshold.json` and other artifacts referenced in `config.py`.
+
+How to run final training (after optimizers finished):
+
+```bash
+# Ensure best params files exist in models/ (created by optimizers)
+python train_ensemble.py
+```
+
+Expected runtime: depends on machine, number of folds and model complexity. Use GPU-enabled CatBoost to reduce time for CatBoost models.
+
+## Prediction (predict_ensemble.py)
+
+Once `train_ensemble.py` completes successfully, run:
+
+```bash
+python predict_ensemble.py
+```
+
+This does:
+- Loads test features via `create_feature_df` for `config.TEST_FILE_PATH`.
+- Loads per-fold models and calibrators, averages fold predictions and applies side-swap averaging.
+- Combines model predictions by the saved ensemble method and weights.
+- Applies ensemble-level isotonic calibration if available.
+- Binarizes with the saved threshold and writes `submission/ensamble_submission.csv`.
+
+## Configuration
+
+Primary settings are in `config.py`. Key parameters:
+- `TRAIN_FILE_PATH`, `TEST_FILE_PATH` — source data paths.
+- `MODEL_OUTPUT_DIR`, `ENSEMBLE_WEIGHTS_PATH`, `THRESHOLD_PATH` — output artifact paths.
+- `N_SPLITS` — number of CV folds (default: 10).
+- `RANDOM_STATE` — seed for reproducibility.
+- `MODEL_TYPES` — list of models to train/use in ensemble (default `['lgbm', 'cat', 'xgb']`).
+- `ENSEMBLE_METHOD` — `'weighted_average'`, `'stacking'` or `'auto'`.
+
+Edit `config.py` to adapt to your environment (paths, number of trials, CV settings). The training and prediction scripts consult this file.
+
+## Practical tips and troubleshooting
+
+- GPU for CatBoost: if you want the CatBoost optimizer and training to use GPU, ensure CatBoost GPU is installed and drivers are present. If not available, switch `task_type` to `'CPU'` inside `optimizer_cat.py` or install CatBoost GPU build.
+- Memory: feature matrix with 339 features can be memory intensive for large datasets—monitor memory during CV training.
+- Reproducibility: set `RANDOM_STATE` in `config.py`. The pipeline also uses seed bagging; results depend on seeds and CV splits.
+- Faster experimentation: run optimizers with fewer trials (`config.OPTUNA_TRIALS`) to iterate quickly, then increase trials for final runs.
+
+## Outputs to include in submission
+
+For a professor or reproducible deliverable, include:
+- `feature_engineering.py`, `train_ensemble.py`, `predict_ensemble.py`, `config.py` (clean documented code)
+- `REPORT.md` (technical report)
+- `models/` folder with final models and `*.json` best-params files (optional, large)
+- `submission/ensamble_submission.csv` (final predictions)
+
+## Contact & next steps
+
+If you want, I can:
+- Run the three optimizers in parallel (or sequentially) and collect the `best_params` files.
+- Launch `train_ensemble.py` with those params and produce a final submission.
+- Add a small `Makefile` or orchestration script to run the full pipeline with one command.
+
+---
+
+End of README — concise, professional project overview and run instructions.
