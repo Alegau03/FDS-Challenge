@@ -13,8 +13,8 @@ Parametri principali:
 """
 
 # --- Percorsi dei file di dati ---
-TRAIN_FILE_PATH = 'data/train.jsonl'
-TEST_FILE_PATH = 'data/test.jsonl'
+TRAIN_PATH = "/kaggle/input/fds-pokemon-battles-prediction-2025/train.jsonl"
+TEST_PATH = "/kaggle/input/fds-pokemon-battles-prediction-2025/test.jsonl"
 
 # --- Percorsi di output ---
 # Assicurati che la cartella 'models/' esista
