@@ -1,0 +1,5 @@
+{
+  "threshold": 0.49000000000000005,
+  "oof_accuracy": 0.8472,
+  "method": "weighted_average"
+}

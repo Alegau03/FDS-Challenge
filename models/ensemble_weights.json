@@ -1,0 +1,10 @@
+{
+  "method": "weighted_average",
+  "threshold": 0.49000000000000005,
+  "oof_accuracy": 0.8472,
+  "weights": {
+    "lgbm": 0.5,
+    "cat": 0.5,
+    "xgb": 0.0
+  }
+}
