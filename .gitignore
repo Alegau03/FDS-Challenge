@@ -2,3 +2,4 @@
 dataset/*
 Lorenzinco/__pycache__
 Lorenzinco/artifacts/*
+data/train.jsonl
